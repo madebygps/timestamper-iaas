@@ -1,24 +1,22 @@
 #!/bin/bash
 
-# Configuration variables
-
 INPUT_DIR="/volume1/shared-mount/mp4s"
 LOG_DIR = "volume1/shared-mount/logs"
 LOG_FILE = "$LOG_FILE/watcher.log"
 PID_FILE = "/var/run/mp4_watcher.pid"
 SCRIPT_NAME = "MP4 Watcher"
 
-# Logging setup 
+
 setup_logging()
 { 
   mkdir -p "$LOG_DIR" 
-  # Rotate logs if file exceeds 10 mb
+
   if [ -f "$LOG_FILE" ] && [ $(stat -f%z "$LOG_FILE") -gt 10485760 ]; then
     mv "$LOG_FILE" "$LOG_FILE.old"
   fi
 }
 
-# Logging function
+
 
 log()
 {
@@ -28,7 +26,7 @@ log()
   echo "[$timestamp] [$level] $message" | tee -a "$LOG_FILE"
 }
 
-# Check dependencies 
+
 check_dependencies() {
   for cmd in inotifywait ffmpeg; do
     if ! command -v $cmd &> /dev/null; then
@@ -38,38 +36,34 @@ check_dependencies() {
   done
 }
 
-# Main daemon function 
+
 start_daemon()
 {
   setup_logging
   check_dependencies
 
-  # Check if already running
   if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
     log "ERROR" "$SCRIPT_NAME is already running!"
     exit 1 
   fi
 
-  # Create input directory if it doesn't exist
   if ! mkdir -p "$INPUT_DIR"; then
     log "ERROR" "Failed to create input directory: $INPUT_DIR"
   fi
 
-  # Start the daemon
+
   log "INFO" "Starting $SCRIPT_NAME daemon"
   echo $$ > "$PID_FILE"
 
-  # Monitor directory
+
   inotifywait -m -e create -e moved_to "$input_dir" 2>> "$LOG_FILE" | while read -r line; do
-    # Skip the setup messages
+
       if [[ "$line" =~ "Setting up watcher." ]] || [[ "$line" =~ "Watcher established." ]]; then
           continue
       fi
     
-     # Parse the line into components
       read -r directory event filename <<< "$line"
-    
-      # Skip invalid lines
+   
       if [ -z "$directory" ] || [ -z "$event" ] || [ -z "$filename" ]; then
           echo "Skipping invalid line (missing component)"
           continue
@@ -83,7 +77,7 @@ start_daemon()
   done
 }
 
-# Stop daemon function 
+
 stop_daemon(){
   if [ -f "$PID_FILE" ]; then
     log "INFO" "Stopping $SCRIPT_NAME daemon."
@@ -94,7 +88,7 @@ stop_daemon(){
   fi
 }
 
-# Command line interface
+
 case "$1" in
   start)
     start_daemon
